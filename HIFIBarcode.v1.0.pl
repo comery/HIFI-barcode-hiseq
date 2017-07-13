@@ -24,11 +24,12 @@
 	Created :  2017.7
 
 =head1 Contact
-    Author: Shanlin Liu, liushanlin@genomics.cn
+	
+	Author: Shanlin Liu, liushanlin@genomics.cn
             Chengran Zhou, zhouchengran@genomics.cn
-    Publication: S. Liu, C. Yang, C. Zhou, X Zhou, Filling reference gaps 
-	             via assembling DNA barcodes using ihigh-throughput
-                 sequencing - moving toward to barcoding the world. 
+    
+	Citation: S. Liu, C. Yang, C. Zhou, X Zhou, Filling reference gaps via assembling DNA barcodes 
+	using ihigh-throughput sequencing - moving toward to barcoding the world. 
 
 =cut
 #---------------------------help-info-end---------------------------------------#
