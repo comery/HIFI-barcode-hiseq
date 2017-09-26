@@ -17,6 +17,8 @@ foreach my $file (@files){
 my %out;
 my %cons;
 open (CN,">","$ARGV[2]/nontarget.fa");
+open (CNLOG,">","$ARGV[2]/$ARGV[1].note.txt");
+print CNLOG "This is a ID list in the case that the most abundant 'end-sequences' are NOT 10 times higher to the second most ones:\n";
 foreach my $key (sort {$a<=>$b} keys %files){
 	open (FA,"<$files{$key}") || die $!;
 	$/="\>";<FA>;$/="\n";
@@ -36,6 +38,9 @@ foreach my $key (sort {$a<=>$b} keys %files){
 				next if exists $cons{$title};
 				if ($out{$id}{val}==1 && $val==2){
 					print CN ">$title\;len=$len\n$seq\n";
+					my $logname=$title;
+					$logname=~s/_.*//g;
+					print CNLOG "$logname\n";
 					$cons{$title}=1;
 				}
 				next;}
@@ -50,6 +55,8 @@ foreach my $key (sort {$a<=>$b} keys %files){
 	}
 	close FA;
 }
+close CN;
+close CNLOG;
 
 open OT ,">$ARGV[2]/$ARGV[1].final.fa" || die $!;
 for my $id (sort {$a<=>$b} keys %out){

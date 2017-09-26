@@ -103,7 +103,7 @@ while(<IN>){
 	for my $keyi  (sort {$count{$b} <=> $count{$a}} keys %hash){
 		print IFA ">$keyi\n$keyi\n";
 	}
-	system "$Bin/usearch -cluster temp.fa -uc temp.uc -id 0.98";
+	system "$Bin/vsearch --cluster_smallmem temp.fa --uc temp.uc --id 0.98";
 	open (UC,"<",$teuc);
 	while (<UC>){
 		chomp;
