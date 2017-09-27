@@ -39,7 +39,7 @@ The proposed method assemble short-read Illumina sequences based on k-mer sequen
 #### CONTACT US
 
 ##### Email:
-liushanlin at genomics dot cn
+liushanlin at genomics dot cn 
 zhouchengran at genomics dot cn
 
 #### CITATION
