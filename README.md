@@ -33,6 +33,9 @@ EXAMPLES
 	perl HIFIBarcode.v1.0.pl  --fq1 test_1.fq --fq2 test_2.fq --index index_primer.txt  --length 5 --cpunum 10 --outdir test  --outpre testout
 	sh test/runHIFIBarcode.sh
 
+NOTE
+The proposed method assemble short-read Illumina sequences based on k-mer sequence matches and such misassembly was not observed in their real data, but it’s still possible. Thus, we provide a function to hightlight NON-HIGHEST-ABUNDANCE sequences within file which has a suffix of "note.txt".
+
 CONTACT US
 
 Email:
