@@ -32,8 +32,10 @@ Seven Perl scripts in folder HIDIBarcode.V1.0/bin/, including:
 
 #### EXAMPLES
 - 1: run wrapper script to get shell text and then sh runHIFIBarcode.sh to run HIFIBarcode  
+	
 	```perl HIFIBarcode.v1.0.pl  --fq1 test_1.fq --fq2 test_2.fq --index index_primer.txt  --length 5 --cpunum 10 --outdir test  --outpre testout```
 - 2: run shell
+	
 	```sh test/runHIFIBarcode.sh```
 
 #### NOTE
