@@ -39,7 +39,7 @@ Seven Perl scripts in folder HIDIBarcode.V1.0/bin/, including:
 	```sh test/runHIFIBarcode.sh```
 
 #### NOTE
-The proposed method assemble short-read Illumina sequences based on k-mer sequence matches and such misassembly was not observed in their real data, but it’s still possible. Thus, we provide a function to hightlight NON-HIGHEST-ABUNDANCE sequences within file which has a suffix of "note.txt".
+The proposed method assemble short-read Illumina sequences based on k-mer sequence matches and such misassembly was not observed in their real data, but it’s still possible. The pipeline also provides an additional note file with a suffix of “note.txt” with notes alerting users about the possibilities which have similar or same scores comparing to their best alternative.
 
 #### CONTACT US
 
