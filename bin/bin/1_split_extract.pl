@@ -102,8 +102,8 @@ sub convert {
         return $primer;
 }
 open ERR, ">$Out\_err.fasta" || die $!;
-open MIF, ">$Out\_1.fasta" || die $!;
-open MIR, ">$Out\_2.fasta" || die $!;
+open MIF, ">$Out\_mid_1.fasta" || die $!;
+open MIR, ">$Out\_mid_2.fasta" || die $!;
 my $seqnum=0;
 TNT:while(my $t1=<FFQ>){
         $seqnum++;
