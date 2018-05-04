@@ -31,7 +31,7 @@ while(my $ff=<LI>){
 #	print "$tcov,$id\n";
 }
 
-warn "not equ in For and Rev" unless (keys %cluf == keys %clur);
+warn "Waining: not equ in For and Rev. Some paired reads of ends could not be overlapped in last step that might be caused by the low identity andthey were marked with a letter “O” in the output file $odir/ends/rawends.fas)." unless (keys %cluf == keys %clur);
 my %forkey= (keys %cluf >= keys %clur)?  %cluf :  %clur;
 for my $key (keys %forkey){
 #	print "$key\n";

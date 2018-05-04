@@ -82,7 +82,7 @@ open (BA,">>","$dir/../final.sh") || die $!;
 print BA "$Bin/cmr -a $dir/../step1/$ARGV[1]\_mid_1.fasta  -b $dir/../step1/$ARGV[1]\_mid_2.fasta  -o $dir/mid/mid.fa -2 $dir/mid/$ARGV[1].midfail1 -3 $dir/mid/$ARGV[1].midfail2 -l 30 -u 120 -c 0.95 -m 0\n";
 #gap close
 for (my $i=1;$i<=4;$i++){
-	print BA "$Bin/barcode  -e $dir/ends/$ARGV[1].$i.fa -r $dir/mid/in.lis  -o $dir/asm/bar$i  -x 470 -n 220 -l 100 -v 8 -k 127 -t $cpu \n" ;
+	print BA "$Bin/barcode  -e $dir/ends/$ARGV[1].$i.fa -r $dir/mid/mid.lis  -o $dir/asm/bar$i  -x 470 -n 220 -l 100 -v 8 -k 127 -t $cpu \n" ;
 	print BA "perl $Bin/6_rename_kmer.pl $dir/asm/bar$i.contig $dir/ends/$ARGV[1].$i.fa $dir/asm\n";
 }
 
