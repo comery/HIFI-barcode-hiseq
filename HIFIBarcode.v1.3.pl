@@ -8,7 +8,7 @@
 
 =head1 Usage
 		
-	perl  HIFIBarcode.v1.0.pl  
+	perl  HIFIBarcode.v1.3.pl  
 	--fq1    <str>  fastq 1
 	--fq2    <str>  fastq 2
 	--index  <str>  primer set with index ahead, format in "ID \t seq".
@@ -20,7 +20,7 @@
 	
 =head1 Version
 		
-	Version :  1.0
+	Version :  1.3
 	Created :  2017.7
 
 =head1 Contact

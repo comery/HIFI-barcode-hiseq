@@ -20,6 +20,7 @@ Source code
 	5_forgap_filling.pl
 	6_rename_kmer.pl
 	7_final.pl
+
 (3) Published softwares:
 	VSEARCH v2.4.4. Rognes, Torbjørn, et al. "VSEARCH: a versatile open source tool for metagenomics." PeerJ 4 (2016): e258.
 	COPE CMR v1.3. Liu, Binghang, et al. "COPE: an accurate k-mer-based pair-end reads connection tool to facilitate genome assembly." Bioinformatics 28.22 (2012): 2870-2874.
