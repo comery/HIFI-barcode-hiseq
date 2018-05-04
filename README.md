@@ -41,7 +41,7 @@ liushanlin at genomics dot cn
 zhouchengran at genomics dot cn
 
 ### CITATION
-###Liu, Yang, Zhou, Zhou.(2017). Filling reference gaps via assembling DNA barcodes using high-throughput sequencing - moving toward to barcoding the world. Gigascience. 2017 Oct 25. doi: 10.1093/gigascience/gix104.
+Liu, Yang, Zhou, Zhou.(2017). Filling reference gaps via assembling DNA barcodes using high-throughput sequencing - moving toward to barcoding the world. Gigascience. 2017 Oct 25. doi: 10.1093/gigascience/gix104.
 
 ### LATEST RELEASE
 ### Version 1.3 201805
