@@ -539,7 +539,7 @@ Description
 
 Version
 
-    0.0.1 2018-12-13 The first version.
+    2.0.0 2018-12-13 The first version.
 
 Author
 
@@ -558,7 +558,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "-v", "--version",
     action="version",
-    version="%(prog)s 0.0.1"
+    version="%(prog)s 2.0.0"
 )
 
 subparsers = parser.add_subparsers(dest="command")
