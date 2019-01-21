@@ -1085,7 +1085,8 @@ def format_ends(ends, subsam, split_ends_dir):
                 print("[ERROR]: wrong format in head of ends fasta")
                 exit()
 
-    sub_len = int(len(seqsf.keys()) / subsam)
+    #sub_len = int(len(seqsf.keys()) / subsam)
+    sub_len = int(subsam)
     current_len = 0
     current_cont = ""
     file_mark = 1
@@ -1141,7 +1142,8 @@ def coi_check(contig, codon):
 
 #-------------------------run suncommand------------------------#
 if args.command in ["all", "filter"]:
-
+    t = time.time()
+    begining_all = time.time()
     print_time("[INFO]: Filtering starts:")
 
     filtered_outfile1 = args.outpre + "_filter_highqual_1.fastq"
@@ -1230,6 +1232,7 @@ if args.command in ["all", "filter"]:
 #----------------assign----------------------#
 
 if args.command in ["all", "assign"]:
+    t = time.time()
     print_time("[INFO]: Assigning starts:")
 
     if args.command == "all":
@@ -1445,6 +1448,7 @@ if args.command in ["all", "assign"]:
 
 #-------------------buildend----------------------------#
 if args.command in ["all", "buildend"]:
+    t = time.time()
     print_time("[INFO]: Building ends starts:")
 
     if args.min_overlap > 120:
@@ -1629,6 +1633,7 @@ if args.command in ["all", "buildend"]:
 
 # -------------------chain ---------------------#
 if args.command in ["all", "chain"]:
+    t = time.time()
     print_time("[INFO]: Middle Chaining starts:")
     if args.command == "all":
         inputMiddle = middle_assigned
@@ -1677,6 +1682,7 @@ if args.command in ["all", "chain"]:
 
 # -------------------gap filling---------------------------#
 if args.command in ["all", "gapfill"]:
+    t = time.time()
     if check_program_involed("barcode"):
         print("can not find soapbarcode program in $BIN path")
         exit()
@@ -1703,6 +1709,9 @@ if args.command in ["all", "gapfill"]:
 
     # format ends fasta
     # split ends fasta to several subfiles
+    if args.samp_num < 1:
+        print("samp_num can not be 0")
+        exit()
     split_ends = format_ends(ends, args.samp_num, split_ends_dir)
     subfile = 0
     for s in split_ends:
@@ -1735,6 +1744,7 @@ if args.command in ["all", "gapfill"]:
 
 # ---------------------make output -------------------------#
 if args.command == "mkout":
+    t = time.time()
     print_time("[INFO]: Generating result starts:")
     if os.path.exists(args.contigDir) == False:
         print("[ERROR]: can not find contigDir")
@@ -1779,6 +1789,7 @@ if args.command == "mkout":
 
 # ----------------------polish assemblies----------------------------#
 if args.command == "polish":
+    t = time.time()
     print_time("[INFO]: Polishing starts:")
 
     polish_outfile = args.coi_input + ".polished"
@@ -1833,5 +1844,5 @@ if args.command == "polish":
     run_time("Polishing")
 
 if args.command == "all":
-    run_time("")
-
+    total_time = time.time() - begining_all
+    print("[INFO]: Total run time: {0:.2f}".format(total_time + "s"))
