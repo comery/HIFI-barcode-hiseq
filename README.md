@@ -1,4 +1,4 @@
-##*HIFIBarcode*
+## *HIFIBarcode*
 ---
 
 ### DESCRIPTION
