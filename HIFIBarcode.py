@@ -8,6 +8,10 @@ import gzip
 import subprocess
 import argparse
 
+from bold_identification.BOLDv4_identification_selenium import (
+        main as bold_identification,
+)
+
 t = time.time()
 
 try:
@@ -225,15 +229,6 @@ buildend_group.add_argument(
 )
 
 buildend_group.add_argument(
-    "-oid",
-    metavar="FLOAT",
-    type=float,
-    default=0.95,
-    dest="overlap_identity",
-    help="minimun similarity of overlap region, default=0.95",
-)
-
-buildend_group.add_argument(
     "-tp",
     metavar="INT",
     type=int,
@@ -292,6 +287,15 @@ buildend_group.add_argument(
     help="whether to check amino acid translation\n" + "for reads, default not",
 )
 
+buildend_group.add_argument(
+    "-bom",
+    metavar="INT",
+    type=int,
+    dest="buildend_mismatch",
+    default=1,
+    help="mismatches allow in overlap",
+)
+
 ## only buildend need 
 only_buildend_parser = argparse.ArgumentParser(add_help=False)
 only_buildend_group = only_buildend_parser.add_argument_group(
@@ -312,11 +316,21 @@ chain_group = chain_parser.add_argument_group(
     "chain arguments")
 
 chain_group.add_argument(
-    "-cmr",
-    metavar="STR",
-    type=str,
-    dest="cmr",
-    help="the path of cmr software",
+    "-mi",
+    metavar="INT",
+    type=int,
+    dest="min_insertsize",
+    default=180,
+    help="minimun length of connected fragment",
+)
+
+chain_group.add_argument(
+    "-com",
+    metavar="INT",
+    type=int,
+    dest="chain_mismatch",
+    default=1,
+    help="mismatches allow in overlap",
 )
 
 ## only chain need
@@ -326,24 +340,16 @@ only_chain_group = only_chain_parser.add_argument_group(
 )
 
 only_chain_group.add_argument(
-    "-1",
+    "-ms",
     metavar="STR",
     type=str,
-    dest="middle_R1",
+    dest="middle_input",
     required=True,
-    help="read 1 of middle assignment",
+    help="middle fasta in ssam format",
 )
 
-only_chain_group.add_argument(
-    "-2",
-    metavar="STR",
-    type=str,
-    dest="middle_R2",
-    required=True,
-    help="read 2 of middle assignment",
-)
 
-## gapfill for all mode ---------------------------------------
+## ----------------gapfill for all mode --------------------
 gapfill_parser = argparse.ArgumentParser(add_help=False)
 gapfill_group = gapfill_parser.add_argument_group(
     "gapfill arguments when run all command"
@@ -407,12 +413,12 @@ gapfill_group.add_argument(
     metavar="INT",
     type=int,
     dest="cpu",
-    default=8,
-    help="CPU number(8)"
+    default=4,
+    help="CPU number(4)"
 )
 
 
-## only gapfill nedd
+## -------------only gapfill nedd---------------------------
 only_gapfill_parser = argparse.ArgumentParser(add_help=False)
 only_gapfill_group = only_gapfill_parser.add_argument_group(
     "arguments when only run gapfill"
@@ -435,7 +441,21 @@ only_gapfill_group.add_argument(
     help="the middle fasta's path\n"
 )
 
-# translation need ---------------------------------------
+mkout_parser = argparse.ArgumentParser(add_help=False)
+mkout_group = mkout_parser.add_argument_group(
+    "rename gap filling result to raw barcodes"
+)
+
+mkout_group.add_argument(
+    "-d",
+    metavar="STR",
+    type=str,
+    required=True,
+    dest="contigDir",
+    help="the outdir of gapfill step",
+)
+
+# ------------------translation need -------------------------
 trans_parser = argparse.ArgumentParser(add_help=False)
 trans_group = trans_parser.add_argument_group(
     "translation arguments(when set -rc or -cc)"
@@ -451,7 +471,7 @@ trans_group.add_argument(
 )
 
 trans_group.add_argument(
-    "-frame",
+   "-frame",
     metavar="INT",
     type=int,
     choices=[0, 1, 2],
@@ -459,7 +479,7 @@ trans_group.add_argument(
     help="start codon shift for amino acid" + "translation, default=1",
 )
 
-## polish --------------------------------------------------
+## -----------------------polish -----------------------------
 polish_parser = argparse.ArgumentParser(
     description="polish all assemblies, \n"
     + "to make a confident COI barcode"
@@ -505,7 +525,6 @@ polish_group.add_argument(
     help="minimun length of COI barcode allowed, default=650",
 )
 
-# ------------------------------------------------------------------------------------------------
 
 ###############################################################################
 #####----------------------- main subcommand parsers --------------------######
@@ -527,12 +546,11 @@ Author
     yangchentao at genomics.cn, BGI.
     zhouchengran at genomics.cn, BGI.
     liushanlin at genomics.cn, BGI.
-    mengguanliang at genomics.cn, BGI.
 
 """
 
 parser = argparse.ArgumentParser(
-    prog="HIFIBarcode",
+    prog="HIFI-hiseq",
     description=description,
     formatter_class=argparse.RawTextHelpFormatter,
 )
@@ -570,7 +588,7 @@ parser_filter = subparsers.add_parser(
     "filter",
     parents=[common_parser, filter_parser],
     formatter_class=argparse.RawTextHelpFormatter,
-    help="filter raw reads",
+    help="filter raw reads by quality or expected_err",
 )
 
 ## assign subcommand
@@ -581,7 +599,7 @@ parser_assign = subparsers.add_parser(
              only_assign_parser,
              assign_parser],
     formatter_class=argparse.RawTextHelpFormatter,
-    help="assign reads to samples",
+    help="assign clean reads to samples",
 )
 
 ## buildend subcommand
@@ -593,7 +611,7 @@ parser_buildend = subparsers.add_parser(
              buildend_parser,
              trans_parser],
     formatter_class=argparse.RawTextHelpFormatter,
-    help="do buildend from input fastq\n" + "reads, output HIFI barcodes.",
+    help="buildends for each sample, output DNA fragment with tag",
 )
 
 ## chain subcommand
@@ -603,7 +621,7 @@ parser_chain = subparsers.add_parser(
              chain_parser,
              only_chain_parser],
     formatter_class=argparse.RawTextHelpFormatter,
-    help="connect middle meta-paried reads to longer contigs.",
+    help="connect middle meta-paried reads to longer contigs",
 )
 
 ## gapfill subcommand
@@ -613,7 +631,16 @@ parser_gapfill = subparsers.add_parser(
             gapfill_parser,
             only_gapfill_parser],
     formatter_class=argparse.RawTextHelpFormatter,
-    help="gap filling to make complete COI barcodes.",
+    help="gap filling to generate raw contigs",
+)
+
+## mkout subcommand
+parser_mkout = subparsers.add_parser(
+    "mkout",
+    parents=[common_parser,
+             mkout_parser],
+    formatter_class=argparse.RawTextHelpFormatter,
+    help="rename raw contigs to final COI barcodes"
 )
 
 ## polish subcommand
@@ -623,8 +650,7 @@ parser_polish = subparsers.add_parser(
             index_parser,
             trans_parser],
     formatter_class=argparse.RawTextHelpFormatter,
-    help="polish COI barcode assemblies,\n"
-    + "output confident barcodes."
+    help="polish COI barcode assemblies, output confident barcodes"
 )
 
 ## BOLD_identification
@@ -632,7 +658,7 @@ parser_bold = subparsers.add_parser(
     "bold_identification",
     parents=[],
     formatter_class=argparse.RawTextHelpFormatter,
-    help="do taxa identification\n" + "on BOLD system,\n",
+    help="do taxa identification on BOLD system",
 )
 
 ###############################################################################
@@ -649,7 +675,6 @@ if sys.argv[1] == "bold_identification":
     # if args.command == 'bold_identification':
     sys.argv = sys.argv[1:]
     sys.exit(bold_identification())
-
 
 # -----------------------arguments checking-----------------------#
 ## softwares and databases
@@ -678,7 +703,7 @@ def files_exist_0_or_1(filelist):
         if os.path.exists(file):
             num += 1
         else:
-            print("%s doesn't exist!" % file, file=sys.stderr)
+            print("[Error]: %s doesn't exist!" % file, file=sys.stderr)
     if len(filelist) == num:
         return 0
     else:
@@ -686,14 +711,12 @@ def files_exist_0_or_1(filelist):
 
 def check_and_open_outhandle(file):
     if os.path.exists(file):
-        print("WARRNING: " + file + " exists! now overwriting")
+        print("[WARRNING]: " + file + " exists! now overwriting")
     else:
         print("[INFO]: " + "open file " + file + "...")
     out = open(file, 'w')
     return out
 
-def print_time(str):
-    print(str + " " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
 
 # ----------------------------------------------------------------
 ## input file existing check
@@ -709,9 +732,11 @@ elif args.command == "assign":
 elif args.command == "buildend":
     errors_found += files_exist_0_or_1([args.list])
 elif args.command == "chain":
-    errors_found += files_exist_0_or_1([args.middle_R1, args.middle_R2])
+    errors_found += files_exist_0_or_1([args.middle_input])
 elif args.command == "gapfill":
     errors_found += files_exist_0_or_1([args.gapfill_ends, args.gapfill_mid])
+elif args.command == "mkout":
+    errors_found += files_exist_0_or_1([args.contigDir])
 elif args.command == "polish":
     errors_found += files_exist_0_or_1([args.coi_input])
 else:
@@ -725,19 +750,27 @@ if args.command in ["all", "buildend"]:
             vsearch = args.vsearch
     errors_found += check_program_involed(vsearch)
 
-if args.command in ["all", "chain"]:
-    cmr = "cmr"
-    if hasattr(args, "cmr"):
-        if args.cmr:
-            cmr = args.cmr
-    errors_found += check_program_involed(cmr)
-
 if errors_found > 0:
-    parser.exit("Errors found! Exit!")
+    parser.exit("Errors found, Exit!")
 
 if hasattr(args, "outpre") and args.outpre.endswith("/"):
-    print("outpre is in bad format! no \"/\"")
+    print("[ERROR]: outpre is in bad format! no \"/\"")
     exit()
+
+
+# -----------------------functions for common---------------------#
+def open_input(file):
+    if file.endswith("gz"):
+        return gzip.open(file, 'rt')
+    else:
+        return open(file, 'r')
+
+def print_time(info):
+    print(info + " " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+
+def run_time(info):
+    print("[INFO]: {0} total run time: {1:.2f}".format(info,
+                                                       time.time() - t) + "s")
 
 # -----------------------functions for filtering------------------#
 
@@ -753,10 +786,6 @@ def parse_pe_fastq(fq1, fq2):
             break
         read1, nothing1, qual1 = fq1.readline()[:-1], fq1.readline(), fq1.readline()[:-1]
         read2, nothing2, qual2 = fq2.readline()[:-1], fq2.readline(), fq2.readline()[:-1]
-        qual1 = list(qual1)
-        qual2 = list(qual2)
-        #qual1 = fromstring(qual1, dtype=byte) - phred
-        #qual2 = fromstring(qual2, dtype=byte) - phred
         assert name1 == name2, 'fastq1, fastq2 is not paired-end'
         yield name1, read1, read2, qual1, qual2
 
@@ -787,13 +816,16 @@ def lowquality_rate(q_list, cut_off, phred):
 
 
 # ----------------------functions for assigning-------------------#
+
 def complementation(sequence):
     # make a sequence complement #
-    # replace function of string is too low!
-    sequence = sequence.upper() ## [a bug fixed], reported by Wu Ping 20181129
-    transtable = str.maketrans('ATCG-', 'TAGC-')
-    sequence = sequence.translate(transtable)
-    return sequence
+    complement = { 'A' : 'T', 'G' : 'C', 'C' : 'G', 'T' : 'A',
+                  'a' : 'T', 'g' : 'C', 'c' : 'G', 't': 'A',
+                  'N' : 'N'}
+    t = ''
+    for base in sequence:
+        t += complement[base]
+    return t
 
 def comp_rev(sequence):
     # make a sequence complement and reversed #
@@ -857,6 +889,17 @@ def dis_barcode(barcode_list):
 
 # ----------------------functions for buildend------------------#
 
+def parse_ssam(ssam):
+    while True:
+        tmp = ssam.readline().strip().split()
+        name = tmp[0]
+        if not name:
+            break
+        read1, read2 = tmp[1], tmp[3]
+        qual1, qual2 = tmp[2], tmp[4]
+        if len(read1) == len(read2) and len(qual1) == len(qual2):
+            yield name, read1, read2, qual1, qual2
+
 def comp_rev_list(reads_list):
     # make a list of sequences reverse and complement #
     new_reads_list = []
@@ -866,14 +909,14 @@ def comp_rev_list(reads_list):
 
     return new_reads_list
 
-def match(str1, str2):
+def mismatch(str1, str2):
     # ----count matched bases of two sequences----#
-    matched = 0
+    mismatches = 0
     for base in range(len(str1)):
-        if str1[base] == str2[base]:
-            matched += 1
-    identity = matched / len(str1)
-    return identity
+        if str1[base] != str2[base]:
+            mismatches += 1
+
+    return mismatches
 
 def translate_dnaseq(seq, codon):
     # ---------translate_dnaseq------------#
@@ -889,67 +932,177 @@ def translate_dnaseq(seq, codon):
     else:
         return True
 
+def connectMetapairReads(record,
+                         min_overlap=30,
+                         max_overlap=120,
+                         overlap_mismatch=1,
+                         standard_length=150):
+
+    records = record.strip().split()
+    name = records[0]
+    seq1, seq2 = records[1], records[3]
+    forward_qual, reverse_qual = records[2], records[4]
+    seq2 = comp_rev(seq2)
+    reverse_qual = reverse_qual[::-1]
+
+    singal = 0
+    overlaps = {}
+    for s in range(min_overlap, max_overlap + 1):
+        l0 = seq1[-s:]
+        l1 = seq2[0:s]
+        tmp_mismatch = mismatch(l0, l1)
+        if tmp_mismatch == 0:
+            overlaps[s] = 1
+            # find best result, so exit loop #
+            break
+
+        elif tmp_mismatch <= overlap_mismatch:
+            tmp_identity = 1 - (tmp_mismatch / standard_length)
+            overlaps[s] = tmp_identity
+
+    # find best overlaping result in all potenial positions
+    # candidates = sorted(overlaps.items(),
+    # lambda x, y: cmp(x[1], y[1]), reverse=True)
+    candidates = sorted(
+        overlaps, key=overlaps.__getitem__, reverse=True
+    )
+
+    if len(candidates) > 0:
+
+        potenial = candidates[0]  # overlap similarity top 1
+        s0 = seq1[-potenial:]
+        s1 = seq2[0:potenial]
+
+        corrected = ""
+
+        # compare each base from forward and reverse to keep one
+        # forward == reverse
+        # forward ne reverse, quality(forward) > quality(reverse)
+        # forward ne reverse, quality(forward) < quality(reverse)
+
+        for p in range(len(s0)):
+            # site is changed, be careful!#
+            tmp_loca0 = standard_length - potenial + p
+
+            if s0[p] == s1[p]:
+                corrected += s0[p]
+                info = s0[p] + "=" + s1[p]
+            else:
+                for_quality = forward_qual[tmp_loca0]
+                rev_quality = reverse_qual[p]
+                if for_quality >= rev_quality:
+                    corrected += s0[p]
+                else:
+                    corrected += s1[p]
+
+        makeup_consensus = (
+            seq1[: standard_length - potenial]
+            + corrected
+            + seq2[potenial - standard_length :]
+        )
+
+        len_makeup_consensus = len(makeup_consensus)
+        this_oid = overlaps[potenial] * 100
+        this_oid = str("%.2f" % this_oid)
+
+        return makeup_consensus
+
+def sortLengthSizeTrim(seqs, ori=1):
+    """
+    sort list by count of item
+    """
+    # when connect ends, I reverse and complement all 2 end,
+    # so for reverse primer end, must return very begining
+    # state.
+    if ori == 2:
+        seqs = comp_rev_list(seqs)
+
+    count = {}
+    for s in seqs:
+        if s in count.keys():
+            count[s] += 1
+        else:
+            count[s] = 1
+
+    seqs = sorted(seqs, key=lambda k : count[k], reverse=True)
+    max_length = len(seqs[0])
+    effect_length = max_length
+    """from tail to head, check the coverage of each base"""
+    for i in range(max_length, 0, -1):
+        coverage_this_base = 0
+        for item in seqs:
+            if len(item) >= i:
+                coverage_this_base += 1
+        if coverage_this_base >= 5:
+            break
+        else:
+            effect_length -= 1
+    new_seqs = []
+    for s in seqs:
+        new_seqs.append(s[:effect_length])
+    if ori == 1:
+        return new_seqs
+    else:
+        return comp_rev_list(new_seqs)
 
 # --------------------function for gapfill---------------------#
 def parse_fasta(fa_fh):
     while True:
         name = fa_fh.readline().strip()
-        if len(name) == 0:
+        if not name or name[0] != ">":
             break
+        name = name.replace(">", "")
         seq = fa_fh.readline().strip()
         yield name, seq
-
-
-def strpy(w1=96, w2=2):
-    x = []
-    for i in range(w1):
-        arr = []
-        for j in range(w2):
-            arr.append(0)
-        x.append(arr)
-    return x
 
 def format_ends(ends, subsam, split_ends_dir):
     endfile = []
     seqsf = {}
     seqsr = {}
     abundance = {}
+    all_samples = []
     with open(ends, 'r') as fh:
         for i in parse_fasta(fh):
             head, seq = i
             tmp = head.split("_")
-            tag1 = int(tmp[0][-3:]) - 1
-            tag2 = int(tmp[1]) - 1
+            tag1 = int(tmp[0][-3:])
+            if tag1 not in all_samples:
+                all_samples.append(tag1)
             ab = tmp[2]
             if "For" in head:
                 if tag1 not in seqsf.keys():
-                    seqsf[tag1] = []
-                seqsf[tag1].append(seq)
+                    seqsf[tag1] = [seq]
+                else:
+                    seqsf[tag1].append(seq)
                 abundance[seq] = ab
             elif "Rev" in head:
                 if tag1 not in seqsr.keys():
-                    seqsr[tag1] = []
-                seqsr[tag1].append(seq)
+                    seqsr[tag1] = [seq]
+                else:
+                    seqsr[tag1].append(seq)
                 abundance[seq] = ab
             else:
                 print("[ERROR]: wrong format in head of ends fasta")
                 exit()
-    sub_len = int(len(seqsf) / subsam)
+
+    sub_len = int(len(seqsf.keys()) / subsam)
     current_len = 0
     current_cont = ""
     file_mark = 1
-    for s in range(96):
-        #sample_id = "{0:.3d}".format(s+1)
-        sample_id = format(s+1, '03d')
+    sorted_all_samples = sorted(all_samples)
+    for s in sorted_all_samples:
+        sample_id = format(s, '03d')
         current_len += 1
+        order_sam = 0
         for f in range(len(seqsf[s])):
             fs = f + 1
             abf = abundance[seqsf[s][f]]
             for r in range(len(seqsr[s])):
                 rs = r + 1
+                order_sam += 1
                 abr = abundance[seqsr[s][r]]
-                end = ">{0}_{1}-{2};{3}-{4}\n".format(
-                    sample_id, fs, rs, abf, abr)
+                end = ">{0}_{1}-{2};{5};{3}-{4}\n".format(
+                    sample_id, fs, rs, abf, abr, order_sam)
                 end += "{0}\n{1}".format(seqsf[s][f], seqsr[s][r])
                 if len(current_cont) == 0:
                     current_cont = end
@@ -973,8 +1126,23 @@ def format_ends(ends, subsam, split_ends_dir):
 
     return endfile
 
-#--------------------------------------------------------
+# -------------------functions for translation-----------------#
+def coi_check(contig, codon):
+    # ---------------coi_check------------#
+    for_trim = args.index + 25 + 1
+    rev_trim = args.index + 26
+    contig = contig[for_trim:]
+    # contig = contig[0:for_trim] #bug!
+    contig = contig[:-rev_trim]
+    if translate_dnaseq(contig, codon):
+        return True
+    else:
+        return False
+
+#-------------------------run suncommand------------------------#
 if args.command in ["all", "filter"]:
+
+    print_time("[INFO]: Filtering starts:")
 
     filtered_outfile1 = args.outpre + "_filter_highqual_1.fastq"
     filtered_outfile2 = args.outpre + "_filter_highqual_2.fastq"
@@ -1009,16 +1177,8 @@ if args.command in ["all", "filter"]:
             args.expected_err = 10
         log.write("Filtering by expected_err: {}".format(args.expected_err) + "\n")
 
-    print_time("[INFO]: Filtering start:")
-
-    if args.fastq1.endswith("gz"):
-        fq1 = gzip.open(args.fastq1, 'rt')
-    else:
-        fq1 = open(args.fastq1, 'r')
-    if args.fastq2.endswith("gz"):
-        fq2 = gzip.open(args.fastq2, 'rt')
-    else:
-        fq2 = open(args.fastq2, 'r')
+    fq1 = open_input(args.fastq1)
+    fq2 = open_input(args.fastq2)
 
     for i in parse_pe_fastq(fq1, fq2):
         name, seq1, seq2, qual1, qual2 = i
@@ -1030,15 +1190,13 @@ if args.command in ["all", "filter"]:
         total += 1
         N_count1 = seq1.count("N")
         N_count2 = seq2.count("N")
-        qual_str1 = "".join(qual1)
-        qual_str2 = "".join(qual2)
 
         if N_count1 < args.n or N_count2 < args.n:
             if filter_type == 1:
                 if (exp_e(qual1, args.phred) <= args.expected_err
                     and exp_e(qual2, args.phred) <= args.expected_err):
-                    out1.write(name + " 1\n" + seq1 + "\n" + "+\n" + qual_str1 + "\n")
-                    out2.write(name + " 2\n" + seq2 + "\n" + "+\n" + qual_str2 + "\n")
+                    out1.write(name + " 1\n" + seq1 + "\n" + "+\n" + qual1 + "\n")
+                    out2.write(name + " 2\n" + seq2 + "\n" + "+\n" + qual2 + "\n")
                     clean += 1
                 else:
                     low += 1
@@ -1067,11 +1225,12 @@ if args.command in ["all", "filter"]:
     out2.close()
 
     print_time("[INFO]: Filtering done:")
+    run_time("Filtering")
 
-#----------------assign------------------------------------------------------------
+#----------------assign----------------------#
 
 if args.command in ["all", "assign"]:
-    print_time("[INFO]: Assigning start:")
+    print_time("[INFO]: Assigning starts:")
 
     if args.command == "all":
         args.fq1 = filtered_outfile1
@@ -1080,9 +1239,9 @@ if args.command in ["all", "assign"]:
     elif args.command == "assign":
         assigned_outdir = os.path.abspath(args.outdir)
 
-    ErrFile = check_and_open_outhandle(assigned_outdir + "_err.fasta")
-    Middle_F = check_and_open_outhandle(assigned_outdir + "_assign_midF.fasta")
-    Middle_R = check_and_open_outhandle(assigned_outdir + "_assign_midR.fasta")
+    ErrFile = check_and_open_outhandle(args.outpre + "_essign_err.fasta")
+    middle_assigned = args.outpre + "_assign_mid.ssam"
+    Middle_ssam = check_and_open_outhandle(middle_assigned)
 
     indexlen = args.index
 
@@ -1133,8 +1292,10 @@ if args.command in ["all", "assign"]:
 
     # analysis barcodes and demultiplex argument(mismatch)
     (min_dis, max_dis) = dis_barcode(barcodes)
-    print("min distance among barcodes is {}".format(min_dis))
-    print("max distance among barcodes is {}".format(max_dis))
+    print("[INFO]: min distance among barcodes is {}".format(min_dis))
+    print("[INFO]: max distance among barcodes is {}".format(max_dis))
+    print("[INFO]: mismatches allowed in barcodes is {}".format(args.tag_mismatch))
+
     if args.tag_mismatch and args.tag_mismatch > (min_dis - 1):
         print("mismatch you set is too large to demultiplex, it must be smaller"
              + " than {},".format(min_dis) + " because min distance among barcodes"
@@ -1176,20 +1337,11 @@ if args.command in ["all", "assign"]:
     assigned = 0
 
     # open clean paired fastq
-    if args.fq1.endswith(".gz"):
-        fh1 = gzip.open(args.fq1, "rt")
-    else:
-        fh1 = open(args.fq1, "r")
-
-    if args.fq2.endswith(".gz"):
-        fh2 = gzip.open(args.fq2, "rt")
-    else:
-        fh2 = open(args.fq2, "r")
+    fh1 = open_input(args.fq1)
+    fh2 = open_input(args.fq2)
 
     for i in parse_pe_fastq(fh1, fh2):
         name, seq1, seq2, qual1, qual2 = i
-        qual_str1 = "".join(qual1)
-        qual_str2 = "".join(qual2)
         seqnum += 1
         fmatch = 0
         rmatch = 0
@@ -1228,15 +1380,15 @@ if args.command in ["all", "assign"]:
             if targetf[:3] == "For":
                 filehandle[targetf].write(
                     targetf + "_" + str(seqnum) + " "
-                    + seq1 + " " + qual_str1 + " ")
+                    + seq1 + " " + qual1 + " ")
                 filehandle[targetf].write(
-                    seq2 + " " + qual_str2 + "\n")
+                    seq2 + " " + qual2 + "\n")
             else:
                 filehandle[targetf].write(
                     targetf + "_" + str(seqnum) + " "
-                    + seq2 + " " + qual_str2 + " ")
+                    + seq2 + " " + qual2 + " ")
                 filehandle[targetf].write(
-                    seq1 + " " + qual_str1 + "\n")
+                    seq1 + " " + qual1 + "\n")
 
         elif (rmatch or rmatch_withMis) and (fmatch == False
                                              and fmatch_withMis == False):
@@ -1246,27 +1398,30 @@ if args.command in ["all", "assign"]:
             if targetr[:3] == "For":
                 filehandle[targetr].write(
                     targetr + "_" + str(seqnum) + " "
-                    + seq2 + " " + qual_str2 + " ")
+                    + seq2 + " " + qual2 + " ")
                 filehandle[targetr].write(
-                    seq1 + " " + qual_str1 + "\n")
+                    seq1 + " " + qual1 + "\n")
             else:
                 filehandle[targetr].write(
                     targetr + "_" + str(seqnum) + " "
-                    + seq1 + " " + qual_str1 + " ")
+                    + seq1 + " " + qual1 + " ")
                 filehandle[targetr].write(
-                    seq2 + " " + qual_str2 + "\n")
+                    seq2 + " " + qual2 + "\n")
         elif (fmatch == False
               and fmatch_withMis ==False
               and rmatch == False
               and rmatch_withMis == False):
             assigned += 1
             count_assigned['middle'] += 1
-            Middle_F.write(
-                ">" + str(seqnum) + "_1\n" + seq1 + "\n"
+            Middle_ssam.write(
+                ">" + str(seqnum) + "_1 " + seq1 + " " + qual1
+                + " " + seq2 + " " + qual2 + "\n"
             )
+            """
             Middle_R.write(
                 ">" + str(seqnum) + "_2\n" + seq2 + "\n"
             )
+            """
         else:
             err += 1
 
@@ -1286,10 +1441,11 @@ if args.command in ["all", "assign"]:
             )
 
     print_time("[INFO]: Assigning done:")
+    run_time("Assigning")
 
-#-----------------------------------------------------------------------------
+#-------------------buildend----------------------------#
 if args.command in ["all", "buildend"]:
-    print_time("[INFO]: Building ends start:")
+    print_time("[INFO]: Building ends starts:")
 
     if args.min_overlap > 120:
         print("[ERROR]: "
@@ -1327,12 +1483,11 @@ if args.command in ["all", "buildend"]:
 
     if args.mode == 1:
         fh_log.write("## clustering identity = "
-                     + str(args.cluster_identity)
-                     + "\n")
+                     + str(args.cluster_identity) + "\n")
 
-    fh_log.write("## overlaping identity = "
-                 + str(args.overlap_identity)
-                 + "\n")
+    fh_log.write("## overlaping mismatch allow = "
+                 + str(args.buildend_mismatch) + "\n")
+
     fh_log.write("## min overlap = " + str(args.min_overlap) + "\n")
     fh_log.write("## max overlap = " + str(args.max_overlap) + "\n")
 
@@ -1344,11 +1499,16 @@ if args.command in ["all", "buildend"]:
     except FileNotFoundError:
         print("[ERROR]: can not find " + args.list)
         exit(0)
-
+    total_pairs = 0
+    connected_pairs = 0
     for line in lines:
         line = line.rstrip()
         name = os.path.basename(line).split(".")[0]
         short_outname = name[:6]
+        if "For" in name:
+            ori = 1
+        else:
+            ori = 2
         fh_log.write("//processing " + name + " done\n")
         # if file is empty, continue
         if os.path.getsize(line) == 0:
@@ -1359,83 +1519,25 @@ if args.command in ["all", "buildend"]:
         with open(line,'r') as fh:
             records = fh.readlines()
             for r in records:
-                both_ends = r.split()
-                if len(both_ends) != 5:
+                total_pairs += 1
+                if (len(r.strip().split())) != 5:
                     continue
-                name = both_ends[0]
-                forward_read = both_ends[1]
-                forward_qual = both_ends[2]
-                reverse_read = both_ends[3]
-                reverse_qual = both_ends[4]
-                reverse_read = comp_rev(reverse_read)
-                reverse_qual = reverse_qual[::-1]
-
-                ##-----------anchoring overlap site--------#
-
-                read0 = forward_read[-args.max_overlap :]
-                read1 = reverse_read[0 : args.max_overlap]
-
-                singal = 0
-                overlaps = {}
-                for s in range(args.min_overlap, args.max_overlap + 1):
-                    l0 = read0[-s:]
-                    l1 = read1[0:s]
-                    tmp_identity = match(l0, l1)
-                    if tmp_identity == 1:
-                        overlaps[s] = 1
-                        # find best result, so exit loop #
-                        break
-
-                    elif tmp_identity >= args.overlap_identity:
-                        overlaps[s] = tmp_identity
-
-                # find best overlaping result in all potenial positions
-                # candidates = sorted(overlaps.items(),
-                # lambda x, y: cmp(x[1], y[1]), reverse=True)
-                candidates = sorted(
-                    overlaps, key=overlaps.__getitem__, reverse=True
-                )
-
-                if len(candidates) > 0:
-
-                    potenial = candidates[0]  # overlap similarity top 1
-                    s0 = read0[-potenial:]
-                    s1 = read1[0:potenial]
-
-                    corrected = ""
-
-                    # compare each base from forward and reverse to keep one
-                    # forward == reverse
-                    # forward ne reverse, quality(forward) > quality(reverse)
-                    # forward ne reverse, quality(forward) < quality(reverse)
-
-                    for p in range(len(s0)):
-                        # site is changed, be careful!#
-                        tmp_loca0 = args.standard_length - potenial + p
-
-                        if s0[p] == s1[p]:
-                            corrected += s0[p]
-                            info = s0[p] + "=" + s1[p]
-                        else:
-                            for_quality = forward_qual[tmp_loca0]
-                            rev_quality = reverse_qual[p]
-                            if for_quality >= rev_quality:
-                                corrected += s0[p]
-                            else:
-                                corrected += s1[p]
-
-                    makeup_consensus = (
-                        forward_read[: args.standard_length - potenial]
-                        + corrected
-                        + reverse_read[potenial - args.standard_length :]
+                makeup_consensus = connectMetapairReads(
+                    r,
+                    min_overlap=args.min_overlap,
+                    max_overlap=args.max_overlap,
+                    overlap_mismatch=args.buildend_mismatch,
+                    standard_length=args.standard_length,
                     )
 
-                    len_makeup_consensus = len(makeup_consensus)
-                    this_oid = overlaps[potenial] * 100
-                    this_oid = str("%.2f" % this_oid)
-
+                if makeup_consensus:
                     # if check result, and ok so write into output_checked file #
                     success_connected.append(makeup_consensus)
+                    connected_pairs += 1
+        # sort success_connected by length and size, meanwhile trim end by
+        # (coverage < 5)
+        success_connected = sortLengthSizeTrim(success_connected, ori)
+
         # output successfully connected ends to a temp file
         pid = os.getpid()
         temp_fasta = "temp.fa" + "." + str(pid)
@@ -1444,11 +1546,12 @@ if args.command in ["all", "buildend"]:
             for i in range(len(success_connected)):
                 TM.write(">" + str(i) + "\n" + success_connected[i] + "\n")
 
-        # cluster these ends 
+        # cluster these ends
         vsearch_cmd = (
             vsearch
-            + " --cluster_fast "
+            + " --cluster_smallmem "
             + temp_fasta
+            + " -usersort "
             + " --threads "
             + str(args.threads)
             + " --quiet "
@@ -1513,43 +1616,71 @@ if args.command in ["all", "buildend"]:
                          + success_connected[int(k)] + "\n"
                         )
 
+    fh_log.write("{0} {1} {2:.3f}".format(total_pairs,
+                                          connected_pairs,
+                                          connected_pairs/total_pairs))
     fh_out.close()
     fh_log.close()
     rm_tmp_cmd = "rm temp.fa.* temp.uc.*"
     os.system(rm_tmp_cmd)
 
     print_time("[INFO]: Building ends done:")
+    run_time("Building")
 
-# connect middle fasta
+# -------------------chain ---------------------#
 if args.command in ["all", "chain"]:
-    print_time("[INFO]: Middle Chaining start:")
+    print_time("[INFO]: Middle Chaining starts:")
     if args.command == "all":
-        read1 = Middle_F
-        read2 = Middle_R
+        inputMiddle = middle_assigned
+        if args.min_insertsize < args.standard_length:
+            print("[ERROR]: min_insertsize can not be less than " + args.standard_length)
+            exit()
     else:
-        read1 = args.middle_R1
-        read2 = args.middle_R2
-    failed1 = args.outpre + "_failed1.fa"
-    failed2 = args.outpre + "_failed2.fa"
-    chain_out = args.outpre + "_chainout.fa"
-    chain_out = os.path.abspath(chain_out)
-    chain_cmr = cmr +\
-                " -a " + read1 +\
-                " -b " + read2 +\
-                " -2 " + failed1 +\
-                " -3 " + failed2 +\
-                " -o " + chain_out +\
-                " -m 0 >cec.log 2>cec.error"
-    print("Run:" + chain_cmr)
-    subprocess.call(chain_cmr, shell=True)
-    print_time("[INFO]: Middle Chaining done:")
+        inputMiddle = args.middle_input
+        if args.min_insertsize < 150:
+            print("[ERROR]: min_insertsize can not be less than 150 bp")
+            exit()
 
-# gap filling
+    chain_out = os.path.abspath(args.outpre + "_chain.fa")
+    chain_log = args.outpre + "_chain.log"
+    cout = open(chain_out, 'w')
+    clog = open(chain_log, 'w')
+    clog.write("total_pairs	connected_pairs	connect_ratio(%)\n")
+    total_pairs = 0
+    connected_pairs = 0
+    with open_input(inputMiddle) as fm:
+        for r in fm:
+            total_pairs += 1
+            tmp = r.strip().split()
+            if len(tmp) != 5:
+                continue
+            else:
+                name = tmp[0].split("_")[0]
+                name = name.replace(">", "")
+            middle_connected = connectMetapairReads(r,
+                                                    overlap_mismatch=args.chain_mismatch)
+
+            if middle_connected and len(middle_connected) >= args.min_insertsize:
+                cout.write(">cop" + name + "\n"
+                           + middle_connected + "\n")
+                connected_pairs += 1
+
+
+    clog.write("{0} {1} {2:.3f}".format(total_pairs,
+                                        connected_pairs,
+                                        connected_pairs/total_pairs))
+    cout.close()
+    clog.close()
+
+    print_time("[INFO]: Middle Chaining done:")
+    run_time("Middle Chaining")
+
+# -------------------gap filling---------------------------#
 if args.command in ["all", "gapfill"]:
     if check_program_involed("barcode"):
         print("can not find soapbarcode program in $BIN path")
         exit()
-    print_time("[INFO]: Gap filling start:")
+    print_time("[INFO]: Gap filling starts:")
     if args.command == "all":
         ends = buildends_result
         middle_lis = os.path.abspath(args.outpre + "_middle_lis")
@@ -1561,9 +1692,8 @@ if args.command in ["all", "gapfill"]:
         mf.write(">\n"
                  +"f=" + chain_out)
 
-
     # outdir
-    barcode_outdir = args.outpre + "_barcode"
+    barcode_outdir = args.outpre + "_gapfill"
     result_outdir = barcode_outdir + "/result"
     split_ends_dir = barcode_outdir + "/ends"
     shell_outdir = barcode_outdir + "/shell"
@@ -1579,7 +1709,7 @@ if args.command in ["all", "gapfill"]:
         s = os.path.abspath(s)
         subfile += 1
         shell = shell_outdir + "/barcodes." + str(subfile) + ".sh"
-        barcode_out = result_outdir + "/barcodes." + str(subfile) + ".fa"
+        barcode_out = result_outdir + "/barcodes." + str(subfile)
         barcode_out = os.path.abspath(barcode_out)
         with open(shell, 'w') as sh:
             sh.write("barcode"
@@ -1593,9 +1723,115 @@ if args.command in ["all", "gapfill"]:
                      + " -k " + str(args.kmer)
                      + " -t " + str(args.cpu)
                     )
-    print("Now you can run shell files in " + shell_outdir)
+
+    print("[RUN]: step 1: run shell files in " + shell_outdir)
     if args.samp_num > 1:
-        print("And, finally run: cat " + result_outdir + "/*.fa >all.barcodes.fa")
+        print("[RUN]: step 2: cat " + result_outdir + "/*.contig >all.barcodes.fa")
     else:
         print("the final barcodes in " + result_outdir)
+
+    print_time("[INFO]: Making gap-filling shell files done:")
+    run_time("Gap-filling")
+
+# ---------------------make output -------------------------#
+if args.command == "mkout":
+    print_time("[INFO]: Generating result starts:")
+    if os.path.exists(args.contigDir) == False:
+        print("[ERROR]: can not find contigDir")
+        exit()
+
+    for e in os.listdir(args.contigDir + "/ends/"):
+        ef = args.contigDir + "/ends/" + e
+        file_maker = ef.split(".")[-1]
+        count = 0
+        order = {}
+        with open(ef, 'r') as fh:
+            for line in fh:
+                if line.startswith(">"):
+                    count += 1
+                    order[count] = line.strip().replace(">", "")
+        cooresponding_result = (args.contigDir
+                                +"/result/barcodes." + file_maker + ".contig")
+        if os.path.exists(cooresponding_result) == False:
+            print("[ERROR]: can not find " + cooresponding_result)
+            continue
+        new_cooresponding_result = cooresponding_result + ".add"
+        new_out = check_and_open_outhandle(new_cooresponding_result)
+        with open(cooresponding_result) as fh:
+            for i in parse_fasta(fh):
+                head, seq = i
+                tmp = head.split()[0].split("_")
+                kmer_info = tmp[0].replace(">", "")
+                sample_order = int(tmp[1])
+                haplotype = int(tmp[2])
+                # just output the first haplotype
+                if haplotype == 1:
+                    head_items = [order[sample_order], "k="+ kmer_info]
+                    new_head = ";".join(head_items)
+                    new_out.write(">" + new_head + "\n" + seq + "\n")
+        new_out.close()
+    # cat results to one file
+    generate_coi = "cat " + args.contigDir + "/result/*.add > " +\
+            args.outpre + "_barcodes.fa"
+    subprocess.call(generate_coi, shell=True)
+    print_time("[INFO]: Generating result done:")
+    run_time("Generating result")
+
+# ----------------------polish assemblies----------------------------#
+if args.command == "polish":
+    print_time("[INFO]: Polishing starts:")
+
+    polish_outfile = args.coi_input + ".polished"
+    coiout = open(polish_outfile,'w')
+
+    with open(args.coi_input, "r") as handle:
+        kmer_info = {}
+        seq_abu = {}
+        sample_seq = {}
+        for i in parse_fasta(handle):
+            name, seq = i
+            items = name.split(";")
+            kmer = items[-1]
+            sample_tag = items[0].split("_")
+            sample = sample_tag[0]
+            coverages = items[2].split("-")
+            for_coverage = int(coverages[0])
+            rev_coverage = int(coverages[1])
+            abu = int((for_coverage + rev_coverage) / 2)
+            length = len(seq)
+            # remove low record with low coverage or short length
+            if (for_coverage < args.min_coverage
+                or rev_coverage < args.min_coverage
+                or length < args.coi_length):
+                continue
+
+            elif args.coi_check and coi_check(str(record.seq), args.codon_table) == False:
+                print(str(sample_tag) + " translation failed")
+                continue
+
+            else:
+                if sample in sample_seq.keys():
+                    sample_seq[sample].append(seq)
+                else:
+                    sample_seq[sample] = [seq]
+                seq_abu[seq] = abu
+                kmer_info[seq] = kmer
+
+    # pick up most confident COI barcode.
+    sorted_samples = sorted(sample_seq.keys())
+    polished_count = len(sorted_samples)
+    for s in sorted_samples:
+        sorted_seq = sorted(sample_seq[s], key=lambda k: seq_abu[k], reverse=True)
+        seq = sorted_seq[0]
+        top_abu = seq_abu[seq]
+        kmer = kmer_info[seq]
+        seqlen = len(seq)
+        head = ">{0};size={1};{2};l={3}".format(s, top_abu, kmer, seqlen)
+        coiout.write(head + "\n" + seq + "\n")
+    coiout.close()
+    print_time("[INFO]: Polishing done:")
+    run_time("Polishing")
+
+if args.command == "all":
+    run_time("")
 
