@@ -1018,14 +1018,16 @@ def sortLengthSizeTrim(seqs, ori=1):
         seqs = comp_rev_list(seqs)
 
     count = {}
+    max_length = 0
     for s in seqs:
+        if len(s) > max_length:
+            max_length = len(s)
         if s in count.keys():
             count[s] += 1
         else:
             count[s] = 1
 
     seqs = sorted(seqs, key=lambda k : count[k], reverse=True)
-    max_length = len(seqs[0])
     effect_length = max_length
     """from tail to head, check the coverage of each base"""
     for i in range(max_length, 0, -1):
@@ -1451,7 +1453,7 @@ if args.command in ["all", "buildend"]:
     t = time.time()
     print_time("[INFO]: Building ends starts:")
 
-    if args.min_overlap > 120:
+    if args.min_overlap < 10 or args.min_overlap > 120:
         print("[ERROR]: "
             + "For COI barcodes, by and large, overlaped length is 30~120 bp, so\
               {} is not proper!".format(args.min_overlap)
