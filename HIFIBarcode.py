@@ -269,18 +269,6 @@ buildend_group.add_argument(
 )
 
 buildend_group.add_argument(
-    "-mode",
-    metavar="INT",
-    type=int,
-    choices=[1, 2],
-    default=1,
-    help="1 or 2; modle 1 is to cluster and keep most [-tp] abundance\n"
-    + "clusters, or clusters abundance more than [-ab], and then make\n"
-    + "a consensus sequence for each cluster. modle 2 is directly to \n"
-    + "make only one consensus sequence without clustering. default=1\n",
-)
-
-buildend_group.add_argument(
     "-rc",
     dest="reads_check",
     action="store_true",
@@ -1018,16 +1006,23 @@ def sortLengthSizeTrim(seqs, ori=1):
         seqs = comp_rev_list(seqs)
 
     count = {}
-    max_length = 0
+    #max_length = 0
     for s in seqs:
-        if len(s) > max_length:
-            max_length = len(s)
+        #if len(s) > max_length:
+         #   max_length = len(s)
         if s in count.keys():
             count[s] += 1
         else:
             count[s] = 1
-
-    seqs = sorted(seqs, key=lambda k : count[k], reverse=True)
+    """
+    just sort by abundance.
+    """
+    #seqs = sorted(seqs, key=lambda k : count[k], reverse=True)
+    """
+    sort by length and abundance
+    """
+    seqs = sorted(seqs, key=lambda k : (len(k), count[k]), reverse=True)
+    max_length = len(seqs[0])
     effect_length = max_length
     """from tail to head, check the coverage of each base"""
     for i in range(max_length, 0, -1):
@@ -1485,11 +1480,8 @@ if args.command in ["all", "buildend"]:
     else:
         fh_log.write("## check codon translation = no\n")
 
-    fh_log.write("## consensus mode = " + str(args.mode) + "\n")
-
-    if args.mode == 1:
-        fh_log.write("## clustering identity = "
-                     + str(args.cluster_identity) + "\n")
+    fh_log.write("## clustering identity = "
+                 + str(args.cluster_identity) + "\n")
 
     fh_log.write("## overlaping mismatch allow = "
                  + str(args.buildend_mismatch) + "\n")
