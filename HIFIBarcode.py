@@ -62,7 +62,10 @@ soft_group.add_argument(
 )
 
 soft_group.add_argument(
-    "-threads", metavar="<INT>", default=2, help="threads for vsearch, default=2"
+    "-threads",
+    metavar="<INT>",
+    default=2,
+    help="threads for vsearch, default=2",
 )
 
 soft_group.add_argument(
@@ -158,19 +161,12 @@ assign_group.add_argument(
 )
 
 assign_group.add_argument(
-    "-outdir",
-    metavar="<STR>",
-    default="assigned",
-    help="output directory for assignment," + 'default="assigned"',
-)
-
-assign_group.add_argument(
     "-tmis",
     metavar="<INT>",
     type=int,
     dest="tag_mismatch",
-    default=0,
-    help="mismatch number in tag when demultiplexing, default=0",
+    default=1,
+    help="mismatch number in tag when demultiplexing, default=1",
 )
 
 assign_group.add_argument(
@@ -214,18 +210,18 @@ buildend_group.add_argument(
     "-min",
     metavar="INT",
     type=int,
-    default=30,
+    default=10,
     dest="min_overlap",
-    help="minimun length of overlap, default=30",
+    help="minimun length of overlap, default=10",
 )
 
 buildend_group.add_argument(
     "-max",
     metavar="INT",
     type=int,
-    default=120,
+    default=150,
     dest="max_overlap",
-    help="maximum length of overlap, default=120",
+    help="maximum length of overlap, default=150",
 )
 
 buildend_group.add_argument(
@@ -652,8 +648,6 @@ parser_bold = subparsers.add_parser(
 ###############################################################################
 #####---------------------- program execution start ----------------------#####
 
-args = parser.parse_args()
-
 # -----------------------BOLD identification----------------------#
 if len(sys.argv) == 1:
     parser.print_help()
@@ -664,6 +658,7 @@ if sys.argv[1] == "bold_identification":
     sys.argv = sys.argv[1:]
     sys.exit(bold_identification())
 
+args = parser.parse_args()
 # -----------------------arguments checking-----------------------#
 ## softwares and databases
 def check_program_involed(cmd):
@@ -706,7 +701,6 @@ def check_and_open_outhandle(file):
     return out
 
 
-# ----------------------------------------------------------------
 ## input file existing check
 errors_found = 0
 if args.command == "all":
@@ -752,6 +746,12 @@ def open_input(file):
         return gzip.open(file, 'rt')
     else:
         return open(file, 'r')
+
+def checkDirMkdir(fold):
+    outdir = os.path.abspath(args.outpre + "_assign")
+    if os.path.exists(outdir) == False:
+        os.mkdir(outdir)
+    return outdir
 
 def print_time(info):
     print(info + " " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
@@ -1004,25 +1004,9 @@ def sortLengthSizeTrim(seqs, ori=1):
     # state.
     if ori == 2:
         seqs = comp_rev_list(seqs)
-
-    count = {}
-    #max_length = 0
-    for s in seqs:
-        #if len(s) > max_length:
-         #   max_length = len(s)
-        if s in count.keys():
-            count[s] += 1
-        else:
-            count[s] = 1
-    """
-    just sort by abundance.
-    """
-    #seqs = sorted(seqs, key=lambda k : count[k], reverse=True)
-    """
-    sort by length and abundance
-    """
-    seqs = sorted(seqs, key=lambda k : (len(k), count[k]), reverse=True)
-    max_length = len(seqs[0])
+    # trim low coverage bases from tail
+    seqlens = [len(n) for n in seqs]
+    max_length = max(seqlens)
     effect_length = max_length
     """from tail to head, check the coverage of each base"""
     for i in range(max_length, 0, -1):
@@ -1037,10 +1021,24 @@ def sortLengthSizeTrim(seqs, ori=1):
     new_seqs = []
     for s in seqs:
         new_seqs.append(s[:effect_length])
+
+    # sort trimed seq list by abundance
+    count = {}
+    for s in new_seqs:
+        if s in count.keys():
+            count[s] += 1
+        else:
+            count[s] = 1
+    #just sort by abundance.
+    #seqs = sorted(new_seqs, key=lambda k : count[k], reverse=True)
+
+    #sort by length and abundance
+    seqs = sorted(new_seqs, key=lambda k : (len(k), count[k]), reverse=True)
+
     if ori == 1:
-        return new_seqs
+        return seqs
     else:
-        return comp_rev_list(new_seqs)
+        return comp_rev_list(seqs)
 
 # --------------------function for gapfill---------------------#
 def parse_fasta(fa_fh):
@@ -1142,9 +1140,9 @@ if args.command in ["all", "filter"]:
     t = time.time()
     begining_all = time.time()
     print_time("[INFO]: Filtering starts:")
-
-    filtered_outfile1 = args.outpre + "_filter_highqual_1.fastq"
-    filtered_outfile2 = args.outpre + "_filter_highqual_2.fastq"
+    filter_outdir = checkDirMkdir(args.outpre + "_filter")
+    filtered_outfile1 = filter_outdir + "/filter_highqual_1.fastq"
+    filtered_outfile2 = filter_outdir + "/filter_highqual_2.fastq"
     out1 = check_and_open_outhandle(filtered_outfile1)
     out2 = check_and_open_outhandle(filtered_outfile2)
 
@@ -1154,7 +1152,7 @@ if args.command in ["all", "filter"]:
     nn = 0
     low = 0
 
-    log = check_and_open_outhandle(args.outpre + "_filter_log.txt")
+    log = check_and_open_outhandle(filter_outdir + "/filter_log.txt")
 
     if args.expected_err and args.quality:
         print(
@@ -1235,18 +1233,14 @@ if args.command in ["all", "assign"]:
     if args.command == "all":
         args.fq1 = filtered_outfile1
         args.fq2 = filtered_outfile2
-        assigned_outdir = os.path.abspath(args.outpre + "_assign")
-    elif args.command == "assign":
-        assigned_outdir = os.path.abspath(args.outdir)
 
-    ErrFile = check_and_open_outhandle(args.outpre + "_essign_err.fasta")
-    middle_assigned = args.outpre + "_assign_mid.ssam"
+    assign_outdir = checkDirMkdir(args.outpre + "_assign")
+
+    ErrFile = check_and_open_outhandle(assign_outdir + "/assign_err.fasta")
+    middle_assigned = assign_outdir + "/assign_middle.ssam"
     Middle_ssam = check_and_open_outhandle(middle_assigned)
 
     indexlen = args.index
-
-    if os.path.exists(assigned_outdir) == False:
-        os.mkdir(assigned_outdir)
 
     pris = {}
     indp = {}
@@ -1310,30 +1304,22 @@ if args.command in ["all", "assign"]:
 
     neg_priF = comp_rev(primerF)
     neg_priR = comp_rev(primerR)
-    assigned_list =  args.outpre + "_assign.list"
+    assigned_list =  assign_outdir + "/assign.list"
 
     with open(assigned_list, "w") as ls:
         sorted_sample = sorted(pris.keys())
         for s in sorted_sample:
-            ls.write(
-                assigned_outdir
-                + "/For"
-                + s
-                + ".ssam"
-                + "\n"
-                + assigned_outdir
-                + "/Rev"
-                + s
-                + ".ssam"
-                + "\n"
-            )
+            ls.write(assign_outdir
+                     + "/For" + s + ".ssam"+ "\n"
+                     + assign_outdir
+                     + "/Rev" + s + ".ssam" + "\n")
     # open all assigned files
     filehandle = {}
     for sam in indp.keys():
-        filehandle[sam] = open(assigned_outdir + "/" + sam + ".ssam", "w")
+        filehandle[sam] = open(assign_outdir + "/" + sam + ".ssam", "w")
 
-    seqnum = 0
     err = 0
+    seqnum = 0
     assigned = 0
 
     # open clean paired fastq
@@ -1417,11 +1403,7 @@ if args.command in ["all", "assign"]:
                 ">" + str(seqnum) + "_1 " + seq1 + " " + qual1
                 + " " + seq2 + " " + qual2 + "\n"
             )
-            """
-            Middle_R.write(
-                ">" + str(seqnum) + "_2\n" + seq2 + "\n"
-            )
-            """
+
         else:
             err += 1
 
@@ -1431,7 +1413,7 @@ if args.command in ["all", "assign"]:
         fh.close()
 
     # report assignment information
-    with open(args.outpre + ".assign.log", "w") as log:
+    with open(assign_outdir + "/assign.log", "w") as log:
         log.write("total reads:\t{}\n".format(seqnum))
         log.write("err reads:\t{}\n".format(err))
         log.write("assigned:\t{}\n".format(assigned))
@@ -1461,9 +1443,10 @@ if args.command in ["all", "buildend"]:
     if args.command == "all":
         args.list = assigned_list  # list generated from assign step
 
-    buildends_result = args.outpre + "_buildends.fasta"
+    buildend_outdir = checkDirMkdir(args.outpre + "_buildend")
+    buildends_result = buildend_outdir + "/buildends.fasta"
     fh_out = check_and_open_outhandle(buildends_result)
-    fh_log = check_and_open_outhandle(args.outpre + "_buildends.log")
+    fh_log = check_and_open_outhandle(buildend_outdir + "/buildends.log")
 
     fh_log.write("## assigned reads list file = " + args.list + "\n")
 
@@ -1480,11 +1463,9 @@ if args.command in ["all", "buildend"]:
     else:
         fh_log.write("## check codon translation = no\n")
 
-    fh_log.write("## clustering identity = "
-                 + str(args.cluster_identity) + "\n")
+    fh_log.write("## clustering identity = " + str(args.cluster_identity) + "\n")
 
-    fh_log.write("## overlaping mismatch allow = "
-                 + str(args.buildend_mismatch) + "\n")
+    fh_log.write("## overlaping mismatch allow = " + str(args.buildend_mismatch) + "\n")
 
     fh_log.write("## min overlap = " + str(args.min_overlap) + "\n")
     fh_log.write("## max overlap = " + str(args.max_overlap) + "\n")
@@ -1508,6 +1489,10 @@ if args.command in ["all", "buildend"]:
         else:
             ori = 2
         fh_log.write("//processing " + name + " done\n")
+        if os.path.exists(line) == False:
+            print("[ERROR]: can not find " + line)
+            exit()
+
         # if file is empty, continue
         if os.path.getsize(line) == 0:
             fh_log.write("! file is empty!")
@@ -1640,8 +1625,9 @@ if args.command in ["all", "chain"]:
             print("[ERROR]: min_insertsize can not be less than 150 bp")
             exit()
 
-    chain_out = os.path.abspath(args.outpre + "_chain.fa")
-    chain_log = args.outpre + "_chain.log"
+    chain_outdir = checkDirMkdir(args.outpre + "_chain")
+    chain_out = chain_outdir + "/chain.fasta"
+    chain_log = chain_outdir + "/chain.log"
     cout = open(chain_out, 'w')
     clog = open(chain_log, 'w')
     clog.write("total_pairs	connected_pairs	connect_ratio(%)\n")
@@ -1664,7 +1650,6 @@ if args.command in ["all", "chain"]:
                            + middle_connected + "\n")
                 connected_pairs += 1
 
-
     clog.write("{0} {1} {2:.3f}".format(total_pairs,
                                         connected_pairs,
                                         connected_pairs/total_pairs))
@@ -1681,25 +1666,23 @@ if args.command in ["all", "gapfill"]:
         print("can not find soapbarcode program in $BIN path")
         exit()
     print_time("[INFO]: Gap filling starts:")
+
+    gapfill_outdir = checkDirMkdir(args.outpre + "_gapfill")
+    result_outdir = checkDirMkdir(gapfill_outdir + "/result")
+    split_ends_dir = checkDirMkdir(gapfill_outdir + "/ends")
+    shell_outdir = checkDirMkdir(gapfill_outdir + "/shell")
+    middle_lis = gapfill_outdir + "/middle.lis"
+    
     if args.command == "all":
         ends = buildends_result
-        middle_lis = os.path.abspath(args.outpre + "_middle_lis")
     else:
         ends = args.gapfill_ends
         chain_out = os.path.abspath(args.gapfill_mid)
-        middle_lis = os.path.abspath(args.outpre + "_middleFasta.lis")
+    
     with open(middle_lis, 'w') as mf:
         mf.write(">\n"
                  +"f=" + chain_out)
 
-    # outdir
-    barcode_outdir = args.outpre + "_gapfill"
-    result_outdir = barcode_outdir + "/result"
-    split_ends_dir = barcode_outdir + "/ends"
-    shell_outdir = barcode_outdir + "/shell"
-    for d in [barcode_outdir, result_outdir, split_ends_dir, shell_outdir]:
-        if os.path.exists(d) == False:
-            os.mkdir(d)
 
     # format ends fasta
     # split ends fasta to several subfiles
@@ -1728,10 +1711,6 @@ if args.command in ["all", "gapfill"]:
                     )
 
     print("[RUN]: step 1: run shell files in " + shell_outdir)
-    if args.samp_num > 1:
-        print("[RUN]: step 2: cat " + result_outdir + "/*.contig >all.barcodes.fa")
-    else:
-        print("the final barcodes in " + result_outdir)
 
     print_time("[INFO]: Making gap-filling shell files done:")
     run_time("Gap-filling")
@@ -1740,10 +1719,11 @@ if args.command in ["all", "gapfill"]:
 if args.command == "mkout":
     t = time.time()
     print_time("[INFO]: Generating result starts:")
+
     if os.path.exists(args.contigDir) == False:
         print("[ERROR]: can not find contigDir")
         exit()
-
+    mkout_outdir = checkDirMkdir(args.outpre + "_mkout")
     for e in os.listdir(args.contigDir + "/ends/"):
         ef = args.contigDir + "/ends/" + e
         file_maker = ef.split(".")[-1]
@@ -1776,7 +1756,7 @@ if args.command == "mkout":
         new_out.close()
     # cat results to one file
     generate_coi = "cat " + args.contigDir + "/result/*.add > " +\
-            args.outpre + "_barcodes.fa"
+            mkout_outdir + "/all_barcodes.fasta"
     subprocess.call(generate_coi, shell=True)
     print_time("[INFO]: Generating result done:")
     run_time("Generating result")
@@ -1786,15 +1766,19 @@ if args.command == "polish":
     t = time.time()
     print_time("[INFO]: Polishing starts:")
 
-    polish_outfile = args.coi_input + ".polished"
+    polish_outdir = checkDirMkdir(args.outpre + "_polish")
+    polish_outfile = polish_outdir + "/all.barcodes.polished"
     coiout = open(polish_outfile,'w')
 
+    total_barcodes = 0
+    good_barcodes = 0
     with open(args.coi_input, "r") as handle:
         kmer_info = {}
         seq_abu = {}
         sample_seq = {}
         for i in parse_fasta(handle):
             name, seq = i
+            total_barcodes += 1
             items = name.split(";")
             kmer = items[-1]
             sample_tag = items[0].split("_")
@@ -1833,7 +1817,10 @@ if args.command == "polish":
         seqlen = len(seq)
         head = ">{0};size={1};{2};l={3}".format(s, top_abu, kmer, seqlen)
         coiout.write(head + "\n" + seq + "\n")
+        good_barcodes += 1
     coiout.close()
+    print("All barocdes generated: {}".format(total_barcodes))
+    print("All barocdes polished: {}".format(good_barcodes))
     print_time("[INFO]: Polishing done:")
     run_time("Polishing")
 

@@ -106,7 +106,7 @@ python3 HIFIBarcode.py -outpre hifi -i hifi_barcodes.fa -index 5
 ```
 
 ### PERL version
-if you still use old versions, you can see [PERL VERSION](./PERL_Version.md) for help.
+if you still use old versions, you can see [PERL VERSION](./Perl_version/PERL_Version.md) for help.
 
 ### CONTACT US
 
