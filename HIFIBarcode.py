@@ -8,7 +8,7 @@ import gzip
 import subprocess
 import argparse
 
-from bold_identification.BOLDv4_identification_selenium import (
+from bold_identification.BOLD_identification import (
         main as bold_identification,
 )
 
