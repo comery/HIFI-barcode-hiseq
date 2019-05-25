@@ -807,13 +807,12 @@ def lowquality_rate(q_list, cut_off, phred):
 
 def complementation(sequence):
     # make a sequence complement #
-    complement = { 'A' : 'T', 'G' : 'C', 'C' : 'G', 'T' : 'A',
-                  'a' : 'T', 'g' : 'C', 'c' : 'G', 't': 'A',
-                  'N' : 'N'}
-    t = ''
-    for base in sequence:
-        t += complement[base]
-    return t
+    # replace function of string is too low!
+    sequence = sequence.upper()
+    transtable = str.maketrans('ATCG', 'TAGC')
+    sequence = sequence.translate(transtable)
+    return sequence[::-1]
+
 
 def comp_rev(sequence):
     # make a sequence complement and reversed #
@@ -1663,7 +1662,7 @@ if args.command in ["all", "chain"]:
 if args.command in ["all", "gapfill"]:
     t = time.time()
     if check_program_involed("barcode"):
-        print("can not find soapbarcode program in $BIN path")
+        print("can not find soapbarcode program in your environmental $PATH ")
         exit()
     print_time("[INFO]: Gap filling starts:")
 
@@ -1672,13 +1671,13 @@ if args.command in ["all", "gapfill"]:
     split_ends_dir = checkDirMkdir(gapfill_outdir + "/ends")
     shell_outdir = checkDirMkdir(gapfill_outdir + "/shell")
     middle_lis = gapfill_outdir + "/middle.lis"
-    
+
     if args.command == "all":
         ends = buildends_result
     else:
         ends = args.gapfill_ends
         chain_out = os.path.abspath(args.gapfill_mid)
-    
+
     with open(middle_lis, 'w') as mf:
         mf.write(">\n"
                  +"f=" + chain_out)
