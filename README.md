@@ -37,11 +37,19 @@ HIFIBarcode is designed to run on most platforms, including UNIX, Linux and MacO
 - HIFIBarcode needs software - barcode to achieve gap-filling procee, it can be found in same directory of HIFIBarcode.py
 
 #### Here we go
+download from the lastest release or just ```git clone```
+
 ```
 git clone https://github.com/comery/HIFI-barcode-hiseq.git
-python3 HIFIBarcode.py -h
+
 ```
-	
+
+Type:
+
+```bash
+python3 HIFIBarcode.py -h
+
+```	
 ```text
 usage: HIFI-hiseq [-h] [-v]
                   {all,filter,assign,buildend,chain,gapfill,mkout,polish,taxonomy}
