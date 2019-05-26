@@ -523,7 +523,7 @@ Description
 
 Version
 
-    2.0.0 2018-12-13 The first version.
+    2.0.1 2019-05-25 The first version.
 
 Author
 
@@ -542,7 +542,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "-v", "--version",
     action="version",
-    version="%(prog)s 2.0.0"
+    version="%(prog)s 2.0.1"
 )
 
 subparsers = parser.add_subparsers(dest="command")
@@ -637,9 +637,9 @@ parser_polish = subparsers.add_parser(
     help="polish COI barcode assemblies, output confident barcodes"
 )
 
-## BOLD_identification
+## BOLD_identification, taxonomy
 parser_bold = subparsers.add_parser(
-    "bold_identification",
+    "taxonomy",
     parents=[],
     formatter_class=argparse.RawTextHelpFormatter,
     help="do taxa identification on BOLD system",
@@ -653,8 +653,7 @@ if len(sys.argv) == 1:
     parser.print_help()
     parser.exit()
 
-if sys.argv[1] == "bold_identification":
-    # if args.command == 'bold_identification':
+if sys.argv[1] == "taxonomy":
     sys.argv = sys.argv[1:]
     sys.exit(bold_identification())
 
@@ -672,10 +671,9 @@ def check_program_involed(cmd):
         == 0
     )
     if result:
-        return 0
+        return True
     else:
-        print(cmd + " not found!", file=sys.stderr)
-        return 1
+        return False
 
 def files_exist_0_or_1(filelist):
     '''
@@ -730,7 +728,23 @@ if args.command in ["all", "buildend"]:
     if hasattr(args, "vsearch"):
         if args.vsearch:
             vsearch = args.vsearch
-    errors_found += check_program_involed(vsearch)
+            if check_program_involed(vsearch):
+                print("[INFO]: find vesearch in {}".format(vsearch))
+            else:
+                print("[ERROR]: can not find vesearch in your $PATH")
+                exit()
+
+if args.command in ["all", "gapfill"]:
+    # find cmd in the same folder of main script by default.
+    bin_path = os.path.dirname(sys.argv[0])
+    barcode_exe = os.path.join(bin_path, 'barcode')
+
+    if check_program_involed(barcode_exe):
+        print("[INFO]: find barcode in {}".format(barcode_exe) )
+    else:
+        print("[ERROR]: can not find soapbarcode program in your environmental $PATH ")
+        exit()
+
 
 if errors_found > 0:
     parser.exit("Errors found, Exit!")
@@ -1661,9 +1675,7 @@ if args.command in ["all", "chain"]:
 # -------------------gap filling---------------------------#
 if args.command in ["all", "gapfill"]:
     t = time.time()
-    if check_program_involed("barcode"):
-        print("can not find soapbarcode program in your environmental $PATH ")
-        exit()
+
     print_time("[INFO]: Gap filling starts:")
 
     gapfill_outdir = checkDirMkdir(args.outpre + "_gapfill")
@@ -1697,7 +1709,7 @@ if args.command in ["all", "gapfill"]:
         barcode_out = result_outdir + "/barcodes." + str(subfile)
         barcode_out = os.path.abspath(barcode_out)
         with open(shell, 'w') as sh:
-            sh.write("barcode"
+            sh.write(barcode_exe
                      + " -e " + s
                      + " -r " + middle_lis
                      + " -o " + barcode_out
