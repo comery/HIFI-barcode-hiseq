@@ -20,7 +20,7 @@ except:
     sys.exit("package biopython not found! Please install it!")
 else:
     from Bio.Seq import Seq
-    from Bio.Alphabet import generic_dna
+
 
 
 ###############################################################################
@@ -855,7 +855,7 @@ def decode_mismatch(f, r, dict):
                 tag_mis = 0
                 primer_mis = 0
                 for base in range(len(s1)):
-                    if s1[base] is not s2[base]:
+                    if s1[base] != s2[base]:
                         if base < args.index:
                             tag_mis += 1
                         else:
@@ -881,7 +881,7 @@ def dis_barcode(barcode_list):
         for b2 in barcode_list:
             mismatch = 0
             for base in range(len(b1)):
-                if b1[base] is not b2[base]:
+                if b1[base] != b2[base]:
                     mismatch += 1
             dis.append(mismatch)
     min_dis = min(dis)
@@ -922,12 +922,13 @@ def mismatch(str1, str2):
 def translate_dnaseq(seq, codon):
     # ---------translate_dnaseq------------#
     l_dna = len(seq)
-    if l_dna % 3 is not 0:
+    if l_dna % 3 != 0:
         seq = seq[: -(l_dna % 3)]
         # print("your sequence lenght is not tripple" + \
         # "but no worries, I have trimmed well format")
-    coding_dna = Seq(seq, generic_dna)
-    protein = coding_dna.translate(table=codon)
+    #coding_dna = Seq(seq, generic_dna)
+    #protein = coding_dna.translate(table=codon)
+    protein = Seq(seq).translate()
     if "*" in protein:
         return False
     else:
@@ -1567,7 +1568,7 @@ if args.command in ["all", "buildend"]:
         with open(temp_uc, "r") as uc:
             # there are "H","S","C" in the head of line
             for line in uc.readlines():
-                if line[0] is not "H":
+                if line[0] != "H":
                     continue
                 array = line.split()
                 if array[9] in clusters.keys():
