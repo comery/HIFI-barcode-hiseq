@@ -1,4 +1,7 @@
 ### Change logs
+- HIFIBarcode v2.1.0, 202109.
+	- fix an very important bug in function of 'complementation'
+
 - HIFIBarcode v2.0.1, 201905.
 	- program will find vesearch in your environmental $PATH, whereas find barcode in Bin folder which we have supported.
 	- change the module name of "BOLD_identification" to "taxonomy"

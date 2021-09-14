@@ -7,6 +7,7 @@ import time
 import gzip
 import subprocess
 import argparse
+from icecream import ic
 
 from bold_identification.BOLD_identification import (
         main as bold_identification,
@@ -523,7 +524,7 @@ Description
 
 Version
 
-    2.0.1 2019-05-25 The first version.
+    2.1.0 2021-09-14 The first version.
 
 Author
 
@@ -542,7 +543,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "-v", "--version",
     action="version",
-    version="%(prog)s 2.0.1"
+    version="%(prog)s 2.1.0"
 )
 
 subparsers = parser.add_subparsers(dest="command")
@@ -692,7 +693,7 @@ def files_exist_0_or_1(filelist):
 
 def check_and_open_outhandle(file):
     if os.path.exists(file):
-        print("[WARRNING]: " + file + " exists! now overwriting")
+        print("[WARNING]: " + file + " exists! now overwriting")
     else:
         print("[INFO]: " + "open file " + file + "...")
     out = open(file, 'w')
@@ -825,7 +826,7 @@ def complementation(sequence):
     sequence = sequence.upper()
     transtable = str.maketrans('ATCG', 'TAGC')
     sequence = sequence.translate(transtable)
-    return sequence[::-1]
+    return sequence # [BUG20210914]
 
 
 def comp_rev(sequence):
@@ -935,18 +936,15 @@ def translate_dnaseq(seq, codon):
         return True
 
 def connectMetapairReads(record,
-                         min_overlap=30,
-                         max_overlap=120,
+                         min_overlap=10,
+                         max_overlap=150,
                          overlap_mismatch=1,
                          standard_length=150):
 
     records = record.strip().split()
     name = records[0]
-    seq1, seq2 = records[1], records[3]
-    forward_qual, reverse_qual = records[2], records[4]
-    seq2 = comp_rev(seq2)
-    reverse_qual = reverse_qual[::-1]
-
+    seq1, seq2 = records[1], comp_rev(records[3]) # get complementary and reverse seq2
+    forward_qual, reverse_qual = records[2], records[4][::-1] # reverse seq2's quality
     singal = 0
     overlaps = {}
     for s in range(min_overlap, max_overlap + 1):
@@ -1533,93 +1531,95 @@ if args.command in ["all", "buildend"]:
                     connected_pairs += 1
         # sort success_connected by length and size, meanwhile trim end by
         # (coverage < 5)
-        success_connected = sortLengthSizeTrim(success_connected, ori)
+        if success_connected:
+            success_connected = sortLengthSizeTrim(success_connected, ori)
 
-        # output successfully connected ends to a temp file
-        pid = os.getpid()
-        temp_fasta = "temp.fa" + "." + str(pid)
-        temp_uc = "temp.uc" + "." + str(pid)
-        with open(temp_fasta, "w") as TM:
-            for i in range(len(success_connected)):
-                TM.write(">" + str(i) + "\n" + success_connected[i] + "\n")
+            # output successfully connected ends to a temp file
+            pid = os.getpid()
+            temp_fasta = "temp.fa" + "." + str(pid)
+            temp_uc = "temp.uc" + "." + str(pid)
+            with open(temp_fasta, "w") as TM:
+                for i in range(len(success_connected)):
+                    TM.write(">" + str(i) + "\n" + success_connected[i] + "\n")
 
-        # cluster these ends
-        vsearch_cmd = (
-            vsearch
-            + " --cluster_smallmem "
-            + temp_fasta
-            + " -usersort "
-            + " --threads "
-            + str(args.threads)
-            + " --quiet "
-            + " --uc "
-            + temp_uc
-            + " --id "
-            + str(args.cluster_identity)
-        )
-        subprocess.call(vsearch_cmd, shell=True)
-        # to store clusters, clusters[represent ID] = [clustered IDs]
-        clusters = {}
-        # to store each cluster's abundance, for sorting clusters
-        # e.g. count[represent ID] = 100
-        count = {}
+            # cluster these ends
+            vsearch_cmd = (
+                vsearch
+                + " --cluster_smallmem "
+                + temp_fasta
+                + " -usersort "
+                + " --threads "
+                + str(args.threads)
+                + " --quiet "
+                + " --uc "
+                + temp_uc
+                + " --id "
+                + str(args.cluster_identity)
+            )
+            subprocess.call(vsearch_cmd, shell=True)
+            # to store clusters, clusters[represent ID] = [clustered IDs]
+            clusters = {}
+            # to store each cluster's abundance, for sorting clusters
+            # e.g. count[represent ID] = 100
+            count = {}
 
-        # open temp.uc and statistic each cluster's abundance.
-        with open(temp_uc, "r") as uc:
-            # there are "H","S","C" in the head of line
-            for line in uc.readlines():
-                if line[0] != "H":
-                    continue
-                array = line.split()
-                if array[9] in clusters.keys():
-                    clusters[array[9]].append(array[8])
-                    count[array[9]] += 1
-                else:
-                    clusters[array[9]] = []
-                    clusters[array[9]].append(array[9])
-                    count[array[9]] = 1
+            # open temp.uc and statistic each cluster's abundance.
+            with open(temp_uc, "r") as uc:
+                # there are "H","S","C" in the head of line
+                for line in uc.readlines():
+                    if line[0] != "H":
+                        continue
+                    array = line.split()
+                    if array[9] in clusters.keys():
+                        clusters[array[9]].append(array[8])
+                        count[array[9]] += 1
+                    else:
+                        clusters[array[9]] = []
+                        clusters[array[9]].append(array[9])
+                        count[array[9]] = 1
 
-        # sorting clusters by abundance.#
-        # sorted_clusters = sorted(count, key=count.__getitem__,reverse=True)
-        sorted_clusters = sorted(count, key=lambda k: (count[k], k), reverse=True)
+            # sorting clusters by abundance.#
+            # sorted_clusters = sorted(count, key=count.__getitem__,reverse=True)
+            sorted_clusters = sorted(count, key=lambda k: (count[k], k), reverse=True)
 
-        if args.cluster_number_needKeep:
-            # if set "-tp", keep top N clusters to buildend
-            keep = args.cluster_number_needKeep
-            sorted_clusters = sorted_clusters[0:keep]
-        elif args.abundance_threshod:
-            # if set "-ab", keep all clusters of abundance > ab
-            while sorted_clusters:
-                item = sorted_clusters.pop()
-                if count[item] < args.abundance_threshod:
-                    pass
-                else:
-                    sorted_clusters.append(item)
-                    break
-        elif len(sorted_clusters) > 1:
-            # if set nothing, I will set it to -tp 2
-            # if second most abundant sequence less than 1/10 of first,
-            # remove it!# of course it is just for when tp==2
-            sorted_clusters = sorted_clusters[0:2]
-            if count[sorted_clusters[1]] < count[sorted_clusters[0]] / 10:
-                sorted_clusters.pop()
-        order = 0
-        for k in sorted_clusters:
-            order += 1
-            fh_out.write(">"
-                         + short_outname
-                         + "_" + str(order)
-                         + "_" + str(count[k]) + "\n"
-                         + success_connected[int(k)] + "\n"
-                        )
-
-    fh_log.write("{0} {1} {2:.3f}".format(total_pairs,
-                                          connected_pairs,
-                                          connected_pairs/total_pairs))
-    fh_out.close()
-    fh_log.close()
-    rm_tmp_cmd = "rm temp.fa.* temp.uc.*"
-    os.system(rm_tmp_cmd)
+            if args.cluster_number_needKeep:
+                # if set "-tp", keep top N clusters to buildend
+                keep = args.cluster_number_needKeep
+                sorted_clusters = sorted_clusters[0:keep]
+            elif args.abundance_threshod:
+                # if set "-ab", keep all clusters of abundance > ab
+                while sorted_clusters:
+                    item = sorted_clusters.pop()
+                    if count[item] < args.abundance_threshod:
+                        pass
+                    else:
+                        sorted_clusters.append(item)
+                        break
+            elif len(sorted_clusters) > 1:
+                # if set nothing, I will set it to -tp 2
+                # if second most abundant sequence less than 1/10 of first,
+                # remove it!# of course it is just for when tp==2
+                sorted_clusters = sorted_clusters[0:2]
+                if count[sorted_clusters[1]] < count[sorted_clusters[0]] / 10:
+                    sorted_clusters.pop()
+            order = 0
+            for k in sorted_clusters:
+                order += 1
+                fh_out.write(">"
+                            + short_outname
+                            + "_" + str(order)
+                            + "_" + str(count[k]) + "\n"
+                            + success_connected[int(k)] + "\n"
+                            )
+            fh_log.write("{0} {1} {2:.3f}".format(total_pairs,
+                                            connected_pairs,
+                                            connected_pairs/total_pairs))
+            fh_out.close()
+            fh_log.close()
+            rm_tmp_cmd = "rm temp.fa.* temp.uc.*"
+            os.system(rm_tmp_cmd)
+        else:
+            print(f"[WARNING]: No read pair can be connected in {short_outname}! please check your data!")
 
     print_time("[INFO]: Building ends done:")
     run_time("Building")
