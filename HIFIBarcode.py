@@ -1614,13 +1614,14 @@ if args.command in ["all", "buildend"]:
             fh_log.write("{0} {1} {2:.3f}".format(total_pairs,
                                             connected_pairs,
                                             connected_pairs/total_pairs))
-            fh_out.close()
-            fh_log.close()
-            rm_tmp_cmd = "rm temp.fa.* temp.uc.*"
-            os.system(rm_tmp_cmd)
         else:
             print(f"[WARNING]: No read pair can be connected in {short_outname}! please check your data!")
 
+    fh_out.close()
+    fh_log.close()
+    if success_connected:
+        rm_tmp_cmd = "rm temp.fa.* temp.uc.*"
+        os.system(rm_tmp_cmd)
     print_time("[INFO]: Building ends done:")
     run_time("Building")
 
